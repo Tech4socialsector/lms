@@ -4,7 +4,7 @@
 			class="sticky top-0 z-10 flex items-center justify-between border-b bg-surface-white px-3 py-2.5 sm:px-5"
 		>
 			<Breadcrumbs class="h-7" :items="breadcrumbs" />
-			<div class="flex items-center space-x-2">
+			<div class="flex items-center gap-x-2">
 				<Tooltip v-if="canGoZen()" :text="__('Zen Mode')">
 					<Button @click="goFullScreen()">
 						<template #icon>
@@ -12,7 +12,7 @@
 						</template>
 					</Button>
 				</Tooltip>
-				<Button v-if="canSeeStats()" @click="showVideoStats()">
+				<Button v-if="isAdmin" @click="showVideoStats()">
 					<template #icon>
 						<TrendingUp class="size-4 stroke-1.5" />
 					</template>
@@ -65,10 +65,10 @@
 				</router-link>
 			</div>
 		</header>
-		<div class="grid md:grid-cols-[70%,30%] h-screen">
-			<div v-if="lesson.data.no_preview" class="border-r">
+		<div class="grid md:grid-cols-[70%,30%] h-[94vh]">
+			<div v-if="lesson.data.no_preview" class="border-e">
 				<div class="shadow rounded-md w-3/4 mt-10 mx-auto text-center p-4">
-					<div class="flex items-center justify-center mt-4 space-x-2">
+					<div class="flex items-center justify-center mt-4 gap-x-2">
 						<LockKeyholeIcon class="size-4 stroke-2 text-ink-gray-5" />
 						<div class="text-lg font-semibold text-ink-gray-7">
 							{{ __('This lesson is locked') }}
@@ -113,7 +113,7 @@
 				}"
 			>
 				<div
-					class="border-r pt-5 pb-10 h-full"
+					class="border-e pt-5 pb-10 h-full"
 					:class="{
 						'w-full md:w-3/5 mx-auto border-none !pt-10': zenModeEnabled,
 					}"
@@ -129,7 +129,7 @@
 
 								<div
 									v-if="zenModeEnabled"
-									class="relative flex items-center space-x-2 text-sm mt-1 text-ink-gray-7 group w-fit mt-2"
+									class="relative flex items-center gap-x-2 text-sm mt-1 text-ink-gray-7 group w-fit mt-2"
 								>
 									<span>
 										{{ lesson.data.chapter_title }} -
@@ -137,7 +137,7 @@
 									</span>
 									<Info class="size-3" />
 									<div
-										class="hidden group-hover:block rounded bg-gray-900 px-2 py-1 text-xs text-white shadow-xl absolute left-0 top-full mt-2"
+										class="hidden group-hover:block rounded bg-gray-900 px-2 py-1 text-xs text-white shadow-xl absolute start-0 top-full mt-2"
 									>
 										{{ Math.ceil(lesson.data.membership.progress) }}%
 										{{ __('completed') }}
@@ -147,7 +147,7 @@
 
 							<div
 								v-if="zenModeEnabled"
-								class="flex items-center space-x-2 mt-2 md:mt-0"
+								class="flex items-center gap-x-2 mt-2 md:mt-0"
 							>
 								<Button @click="showDiscussionsInZenMode()">
 									<template #icon>
@@ -204,7 +204,7 @@
 
 						<div v-if="!zenModeEnabled" class="flex items-center mt-4 md:mt-2">
 							<span
-								class="h-6 mr-1"
+								class="h-6 me-1"
 								:class="{
 									'avatar-group overlap': lesson.data.instructors?.length > 1,
 								}"
@@ -263,7 +263,7 @@
 						</div>
 					</div>
 					<div
-						v-if="lesson.data"
+						v-if="lesson.data && (allowDiscussions || tabs.length > 1)"
 						class="mt-10 pb-20 pt-5 border-t px-5"
 						ref="discussionsContainer"
 					>
@@ -293,7 +293,7 @@
 				</div>
 			</div>
 			<div class="sticky top-10">
-				<div class="bg-surface-menu-bar py-5 px-2 border-b">
+				<div class="bg-surface-menu-bar p-5 border-b">
 					<div class="text-lg font-semibold text-ink-gray-9">
 						{{ lesson.data.course_title }}
 					</div>
@@ -313,7 +313,7 @@
 					:courseName="courseName"
 					:key="chapterNumber"
 					:getProgress="lesson.data.membership ? true : false"
-					:lessonProgress="lessonProgress"
+					:completedLesson="completedLesson"
 				/>
 			</div>
 		</div>
@@ -326,7 +326,7 @@
 		@updateNotes="updateNotes"
 	/>
 	<VideoStatistics
-		v-if="showStatsDialog"
+		v-if="isAdmin"
 		v-model="showStatsDialog"
 		:lessonName="lesson.data?.name"
 		:lessonTitle="lesson.data?.title"
@@ -365,7 +365,12 @@ import {
 	MessageCircleQuestion,
 	TrendingUp,
 } from 'lucide-vue-next'
-import { getEditorTools, enablePlyr, highlightText } from '@/utils'
+import {
+	getEditorTools,
+	enablePlyr,
+	highlightText,
+	sanitizeEditorJs,
+} from '@/utils'
 import { sessionStore } from '@/stores/session'
 import { useSidebar } from '@/stores/sidebar'
 import EditorJS from '@editorjs/editorjs'
@@ -399,15 +404,11 @@ const { brand } = sessionStore()
 const sidebarStore = useSidebar()
 const plyrSources = ref([])
 const showInlineMenu = ref(false)
-const currentTab = ref('Notes')
-let timerInterval
+const currentTab = ref(null)
+const completedLesson = ref(null)
+let timerInterval = null
 
-const tabs = ref([
-	{
-		label: __('Notes'),
-		value: 'Notes',
-	},
-])
+const tabs = ref([])
 
 const props = defineProps({
 	courseName: {
@@ -516,15 +517,25 @@ const renderEditor = (holder, content) => {
 	return new EditorJS({
 		holder: holder,
 		tools: getEditorTools(),
-		data: JSON.parse(content),
+		data: sanitizeEditorJs(JSON.parse(content)),
 		readOnly: true,
 		defaultBlock: 'embed',
+		i18n: {
+			direction: document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr',
+		},
 	})
 }
 
 const markProgress = () => {
 	if (user.data && lesson.data && !lesson.data.progress) {
-		progress.submit()
+		progress.submit(
+			{},
+			{
+				onError(err) {
+					console.error(err)
+				},
+			}
+		)
 	}
 }
 
@@ -538,6 +549,7 @@ const progress = createResource({
 	},
 	onSuccess(data) {
 		lessonProgress.value = data
+		completedLesson.value = lesson.data?.name
 	},
 })
 
@@ -605,7 +617,6 @@ watch(
 			plyrSources.value = []
 			await nextTick()
 			resetLessonState(newChapterNumber, newLessonNumber)
-			startTimer()
 			updateNotes()
 			checkIfDiscussionsAllowed()
 			checkQuiz()
@@ -674,9 +685,14 @@ watch(
 	() => lesson.data,
 	async (data) => {
 		setupLesson(data)
-		getPlyrSource()
+		startTimer()
+		await getPlyrSource()
 		updateNotes()
-		if (data.icon == 'icon-youtube') clearInterval(timerInterval)
+		const hasVideoListener =
+			plyrSources.value.length > 0 || !!document.querySelector('video')
+		if (data.icon == 'icon-youtube' && hasVideoListener) {
+			clearInterval(timerInterval)
+		}
 	}
 )
 
@@ -698,6 +714,31 @@ const updateVideoWatchDuration = () => {
 			}
 		})
 	}
+	attachVideoEndedListeners()
+}
+
+const attachVideoEndedListeners = () => {
+	const onVideoEnded = () => {
+		markProgress()
+		trackVideoWatchDuration()
+	}
+
+	document.querySelectorAll('video').forEach((video) => {
+		if (!video._lmsEndedAttached) {
+			video.addEventListener('ended', onVideoEnded)
+			video._lmsEndedAttached = true
+		}
+	})
+
+	plyrSources.value.forEach((plyrSource) => {
+		if (!plyrSource._lmsEndedAttached) {
+			plyrSource.on('ended', onVideoEnded)
+			plyrSource.on('statechange', (event) => {
+				if (event.detail?.code === 0) onVideoEnded()
+			})
+			plyrSource._lmsEndedAttached = true
+		}
+	})
 }
 
 const updatePlyrVideoTime = (video) => {
@@ -735,7 +776,7 @@ const updateVideoTime = (video) => {
 
 const startTimer = () => {
 	if (!lesson.data?.membership) return
-	let timerInterval = setInterval(() => {
+	timerInterval = setInterval(() => {
 		timer.value++
 		if (timer.value == 30) {
 			clearInterval(timerInterval)
@@ -750,11 +791,17 @@ onBeforeUnmount(() => {
 
 const checkIfDiscussionsAllowed = () => {
 	hasQuiz.value = false
-	JSON.parse(lesson.data?.content)?.blocks?.forEach((block) => {
-		if (block.type === 'quiz') {
-			hasQuiz.value = true
+	if (lesson.data?.content) {
+		try {
+			JSON.parse(lesson.data.content)?.blocks?.forEach((block) => {
+				if (block.type === 'quiz') {
+					hasQuiz.value = true
+				}
+			})
+		} catch {
+			// legacy markdown lessons
 		}
-	})
+	}
 
 	if (
 		!hasQuiz.value &&
@@ -769,17 +816,19 @@ const checkIfDiscussionsAllowed = () => {
 	}
 }
 
+const isAdmin = computed(() => {
+	let isInstructor = lesson.data?.instructors?.includes(user.data?.name)
+	return user.data?.is_moderator || isInstructor
+})
+
 const allowEdit = () => {
 	if (window.read_only_mode) return false
-	if (user.data?.is_moderator) return true
-	if (lesson.data?.instructors?.includes(user.data?.name)) return true
-	return false
+	return isAdmin.value
 }
 
 const allowInstructorContent = () => {
-	if (user.data?.is_moderator) return true
-	if (lesson.data?.instructors?.includes(user.data?.name)) return true
-	return false
+	if (window.read_only_mode) return false
+	return isAdmin.value
 }
 
 const enrollment = createResource({
@@ -817,11 +866,6 @@ const toggleInlineMenu = async () => {
 	if (selection.toString()) {
 		showInlineMenu.value = true
 	}
-}
-
-const canSeeStats = () => {
-	if (user.data?.is_moderator || user.data?.is_instructor) return true
-	return false
 }
 
 const showVideoStats = () => {
@@ -883,24 +927,24 @@ const updateNotes = () => {
 }
 
 watch(allowDiscussions, () => {
-	if (allowDiscussions.value) {
-		tabs.value = [
-			{
+	if (!isAdmin.value) {
+		if (!tabs.value.find((tab) => tab.value === 'Notes')) {
+			tabs.value.push({
 				label: __('Notes'),
 				value: 'Notes',
-			},
-			{
+			})
+		}
+		currentTab.value = 'Notes'
+	} else {
+		currentTab.value = allowDiscussions.value ? 'Community' : null
+	}
+	if (allowDiscussions.value) {
+		if (!tabs.value.find((tab) => tab.value === 'Community')) {
+			tabs.value.push({
 				label: __('Community'),
 				value: 'Community',
-			},
-		]
-	} else {
-		tabs.value = [
-			{
-				label: __('Notes'),
-				value: 'Notes',
-			},
-		]
+			})
+		}
 	}
 })
 
@@ -1011,8 +1055,8 @@ usePageMeta(() => {
 	border-radius: 0 0 20px 2px;
 	padding: 2px 26px;
 	padding-top: 0;
-	padding-right: 0;
-	text-align: left;
+	padding-inline-end: 0;
+	text-align: start;
 	cursor: pointer;
 	border: none !important;
 	outline: none !important;
@@ -1020,7 +1064,7 @@ usePageMeta(() => {
 
 .codeBoxSelectDropIcon {
 	position: absolute !important;
-	left: 10px !important;
+	inset-inline-start: 10px !important;
 	bottom: 0 !important;
 	width: unset !important;
 	height: unset !important;
@@ -1077,7 +1121,7 @@ usePageMeta(() => {
 }
 
 .tc-table {
-	border-left: 1px solid #e8e8eb;
+	border-inline-start: 1px solid #e8e8eb;
 }
 
 .plyr__volume input[type='range'] {

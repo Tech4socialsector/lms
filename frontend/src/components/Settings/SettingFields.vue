@@ -1,12 +1,12 @@
 <template>
-	<div class="mb-5 divide-y overflow-y-auto">
+	<div class="mb-5 divide-y divide-outline-gray-modals overflow-y-auto">
 		<div v-for="(section, index) in sections" class="py-5">
 			<div v-if="section.label" class="font-semibold text-ink-gray-9 mb-4">
 				{{ section.label }}
 			</div>
 			<div
 				:class="{
-					'flex justify-between space-x-8 w-full': section.columns.length > 1,
+					'flex justify-between gap-x-8 w-full': section.columns.length > 1,
 				}"
 			>
 				<div
@@ -20,6 +20,7 @@
 							:doctype="field.doctype"
 							:label="__(field.label)"
 							:description="__(field.description)"
+							:required="field.reqd"
 						/>
 
 						<div v-else-if="field.type == 'Code'">
@@ -48,7 +49,7 @@
 								v-if="!data[field.name]"
 								:fileTypes="['image/*']"
 								:validateFile="validateFile"
-								@success="(file) => (data[field.name] = file)"
+								@success="(file) => (data[field.name] = file.file_url)"
 							>
 								<template
 									v-slot="{ file, progress, uploading, openFileSelector }"
@@ -63,34 +64,25 @@
 								</template>
 							</FileUploader>
 							<div v-else>
-								<div class="flex items-center text-sm space-x-2">
+								<div class="flex items-center text-sm gap-x-2">
 									<div
 										class="flex items-center justify-center rounded border border-outline-gray-modals bg-surface-gray-2"
 										:class="field.size == 'lg' ? 'px-5 py-5' : 'px-20 py-8'"
 									>
 										<img
-											:src="data[field.name]?.file_url || data[field.name]"
+											:src="data[field.name]"
 											class="rounded"
 											:class="field.size == 'lg' ? 'w-36' : 'size-6'"
 										/>
 									</div>
 									<div class="flex flex-col flex-wrap">
 										<span class="break-all text-ink-gray-9">
-											{{
-												data[field.name]?.file_name ||
-												data[field.name].split('/').pop()
-											}}
-										</span>
-										<span
-											v-if="data[field.name]?.file_size"
-											class="text-sm text-ink-gray-5 mt-1"
-										>
-											{{ getFileSize(data[field.name]?.file_size) }}
+											{{ data[field.name].split('/').pop() }}
 										</span>
 									</div>
 									<X
 										@click="data[field.name] = null"
-										class="border text-ink-gray-7 border-outline-gray-modals rounded-md cursor-pointer stroke-1.5 w-5 h-5 p-1 ml-4"
+										class="border text-ink-gray-7 border-outline-gray-modals rounded-md cursor-pointer stroke-1.5 w-5 h-5 p-1 ms-4"
 									/>
 								</div>
 							</div>
@@ -104,7 +96,7 @@
 						/>
 						<!-- <div v-else>
 							{{ data[field.name] }}
-							
+
 						</div> -->
 						<FormControl
 							v-else
@@ -115,6 +107,7 @@
 							:rows="field.rows"
 							:options="field.options"
 							:description="field.description"
+							:required="field.reqd"
 							placeholder=""
 						/>
 					</div>
@@ -125,8 +118,8 @@
 </template>
 <script setup>
 import { FormControl, FileUploader, Button, Switch } from 'frappe-ui'
-import { computed, onMounted, watch } from 'vue'
-import { getFileSize, validateFile } from '@/utils'
+import { onMounted, watch } from 'vue'
+import { validateFile } from '@/utils'
 import { X } from 'lucide-vue-next'
 import Link from '@/components/Controls/Link.vue'
 import CodeEditor from '@/components/Controls/CodeEditor.vue'

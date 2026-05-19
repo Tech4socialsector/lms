@@ -1,7 +1,7 @@
 <template>
 	<div class="">
 		<div class="grid md:grid-cols-[75%,25%] h-screen">
-			<div class="border-r">
+			<div class="border-e">
 				<header
 					class="sticky top-0 z-10 flex flex-col md:flex-row md:items-center justify-between border-b overflow-hidden bg-surface-white px-3 py-2.5 sm:px-5"
 				>
@@ -15,17 +15,22 @@
 					</Button>
 				</header>
 				<div class="py-5">
-					<div class="w-5/6 mx-auto">
+					<div class="grid grid-cols-2 gap-5 w-5/6 mx-auto">
 						<FormControl
 							v-model="lesson.title"
-							label="Title"
+							:label="__('Title')"
 							class="mb-4"
 							:required="true"
+							autocomplete="off"
 						/>
-						<FormControl
+						<Switch
 							v-model="lesson.include_in_preview"
-							type="checkbox"
-							label="Include in Preview"
+							:label="__('Include in Preview')"
+							:description="
+								__(
+									'If enabled, the lesson will also be accessible to users who are not enrolled in the course.'
+								)
+							"
 						/>
 					</div>
 					<div class="border-t mt-4">
@@ -42,10 +47,10 @@
 									{{ __('Instructor Notes') }}
 								</label>
 								<ChevronRight
-									class="stroke-2 h-5 w-5 text-ink-gray-5"
+									class="stroke-2 h-5 w-5 text-ink-gray-5 transform duration-200"
 									:class="{
-										'rotate-90 transform duration-200': openInstructorEditor,
-										'duration-200': !openInstructorEditor,
+										'rotate-90': openInstructorEditor,
+										'rtl:rotate-180': !openInstructorEditor,
 									}"
 								/>
 							</div>
@@ -83,6 +88,7 @@ import {
 	Button,
 	createResource,
 	FormControl,
+	Switch,
 	usePageMeta,
 	toast,
 } from 'frappe-ui'
@@ -98,7 +104,7 @@ import { sessionStore } from '../stores/session'
 import EditorJS from '@editorjs/editorjs'
 import LessonHelp from '@/components/LessonHelp.vue'
 import { ChevronRight } from 'lucide-vue-next'
-import { getEditorTools, enablePlyr } from '@/utils'
+import { getEditorTools, enablePlyr, sanitizeEditorJs } from '@/utils'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
 
 const { brand } = sessionStore()
@@ -142,6 +148,9 @@ const renderEditor = (holder) => {
 		holder: holder,
 		tools: getEditorTools(true),
 		defaultBlock: 'markdown',
+		i18n: {
+			direction: document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr',
+		},
 		onChange: async (api, event) => {
 			enablePlyr()
 		},
@@ -182,7 +191,7 @@ const lessonDetails = createResource({
 const addLessonContent = (data) => {
 	editor.value.isReady.then(() => {
 		if (data.lesson.content) {
-			editor.value.render(JSON.parse(data.lesson.content))
+			editor.value.render(sanitizeEditorJs(JSON.parse(data.lesson.content)))
 		} else if (data.lesson.body) {
 			let blocks = convertToJSON(data.lesson)
 			editor.value.render({
@@ -195,7 +204,9 @@ const addLessonContent = (data) => {
 const addInstructorNotes = (data) => {
 	instructorEditor.value.isReady.then(() => {
 		if (data.lesson.instructor_content) {
-			instructorEditor.value.render(JSON.parse(data.lesson.instructor_content))
+			instructorEditor.value.render(
+				sanitizeEditorJs(JSON.parse(data.lesson.instructor_content))
+			)
 		} else if (data.lesson.instructor_notes) {
 			let blocks = convertToJSON(data.lesson)
 			instructorEditor.value.render({
@@ -527,8 +538,15 @@ usePageMeta(() => {
 	max-width: none;
 }
 
+.ce-toolbar__actions,
 .codex-editor--narrow .ce-toolbar__actions {
-	right: 100%;
+	right: auto;
+	left: auto;
+	inset-inline-end: 100%;
+}
+
+.codex-editor--narrow .codex-editor__redactor {
+	margin-inline: 0;
 }
 
 .ce-toolbar__content {
@@ -564,8 +582,8 @@ usePageMeta(() => {
 	border-radius: 0 0 20px 2px;
 	padding: 2px 26px;
 	padding-top: 0;
-	padding-right: 0;
-	text-align: left;
+	padding-inline-end: 0;
+	text-align: start;
 	cursor: pointer;
 	border: none !important;
 	outline: none !important;
@@ -573,7 +591,7 @@ usePageMeta(() => {
 
 .codeBoxSelectDropIcon {
 	position: absolute !important;
-	left: 10px !important;
+	inset-inline-start: 10px !important;
 	bottom: 0 !important;
 	width: unset !important;
 	height: unset !important;
@@ -634,7 +652,7 @@ iframe {
 }
 
 .tc-table {
-	border-left: 1px solid #e8e8eb;
+	border-inline-start: 1px solid #e8e8eb;
 }
 
 .ce-toolbox__button[data-tool='markdown'] {
@@ -671,14 +689,13 @@ iframe {
 	padding: 8px;
 }
 
+.ce-popover,
 .codex-editor--narrow .ce-toolbox .ce-popover,
 .codex-editor--narrow .ce-toolbar__actions .ce-popover {
-	right: unset;
-	left: initial;
-}
-
-.ce-popover {
 	border-radius: 12px;
+	right: auto;
+	left: auto;
+	inset-inline-start: 0;
 }
 
 .cdx-search-field {
@@ -708,8 +725,13 @@ iframe {
 	height: 15px;
 }
 
-.ce-popover--opened > .ce-popover__container {
-	max-height: unset;
+.ce-popover-item__icon {
+	margin-right: unset;
+	margin-inline-end: 10px;
+}
+
+.ce-popover--opened {
+	max-height: unset !important;
 }
 
 .cdx-search-field__icon svg {
@@ -718,7 +740,7 @@ iframe {
 }
 
 .cdx-search-field__icon {
-	margin-right: 5px;
+	margin-inline-end: 5px;
 }
 
 .cdx-block.embed-tool {

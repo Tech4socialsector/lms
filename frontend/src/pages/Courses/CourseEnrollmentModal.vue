@@ -42,7 +42,7 @@
 			</div>
 		</template>
 		<template #actions="{ close }">
-			<div class="text-right">
+			<div class="text-end">
 				<Button variant="solid" @click="enrollStudent(close)">
 					{{ __('Enroll') }}
 				</Button>
@@ -58,6 +58,7 @@ import Link from '@/components/Controls/Link.vue'
 
 const show = defineModel<boolean>({ required: true, default: false })
 const student = ref<string | null>(null)
+const students = defineModel<any[]>('students')
 const payment = ref<string | null>(null)
 const purchasedCertificate = ref<boolean>(false)
 
@@ -79,6 +80,7 @@ const enrollStudent = (close: () => void) => {
 		},
 	})
 		.then(() => {
+			students.value?.reload()
 			toast.success(__('Student enrolled successfully'))
 			close()
 		})
