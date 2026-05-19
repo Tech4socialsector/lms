@@ -1,6 +1,6 @@
 <template>
 	<div class="p-5">
-		<div class="grid grid-cols-4 gap-5 mb-5">
+		<div class="grid grid-cols-4 gap-5 mb-5 text-ink-gray-9">
 			<NumberChartGraph
 				:title="__('Enrolled')"
 				:value="formatAmount(course.data?.enrollments)"
@@ -20,12 +20,12 @@
 			<NumberChartGraph :title="__('Lessons')" :value="course.data?.lessons" />
 		</div>
 		<div class="grid grid-cols-[2fr_1fr] gap-5 items-start">
-			<div v-if="course.data?.enrollments" class="border rounded-lg py-3 px-4">
+			<div class="border rounded-lg py-3 px-4">
 				<div class="flex items-center justify-between mb-3">
 					<div class="text-lg text-ink-gray-9 font-semibold">
 						{{ __('Students') }}
 					</div>
-					<div class="flex items-center space-x-2">
+					<div class="flex items-center gap-x-2">
 						<FormControl
 							v-model="searchFilter"
 							:placeholder="__('Search by name')"
@@ -53,7 +53,7 @@
 						}"
 					>
 						<ListHeader
-							class="mb-2 grid items-center space-x-4 rounded bg-surface-white border-b rounded-none p-2"
+							class="mb-2 grid items-center gap-x-4 rounded bg-surface-white border-b rounded-none p-2"
 						>
 							<ListHeaderItem
 								:item="item"
@@ -91,7 +91,7 @@
 											<ProgressBar
 												v-else-if="column.key == 'progress'"
 												:progress="Math.ceil(row[column.key])"
-												class="!mx-0 !mr-4"
+												class="!mx-0 !me-4"
 											/>
 										</template>
 										<div v-if="column.key == 'creation'">
@@ -129,7 +129,9 @@
 					<div class="text-ink-gray-5 mb-4">
 						{{ __('Progress Summary') }}
 					</div>
-					<div class="grid grid-cols-[2fr_1fr] items-center justify-between">
+					<div
+						class="grid grid-cols-[2fr_1fr] items-center justify-between text-ink-gray-9"
+					>
 						<div class="flex flex-col space-y-4 flex-1 text-sm">
 							<div
 								class="flex items-center text-ink-gray-7"
@@ -151,12 +153,12 @@
 									}"
 								></div>
 								<Tooltip :text="row.name.split('(')[1].replace(')', '')">
-									<div class="ml-2">
+									<div class="ms-2">
 										{{ row.name.split('(')[0] }}
 									</div>
 								</Tooltip>
 								<Tooltip :text="row.value">
-									<div class="ml-auto">
+									<div class="ms-auto">
 										{{
 											Math.round((row.value / course.data?.enrollments) * 100)
 										}}%
@@ -211,13 +213,15 @@
 							class="!w-32"
 						/>
 					</div>
-					<div class="divide-y max-h-[43vh] text-ink-gray-7 overflow-y-auto">
+					<div
+						class="divide-y max-h-[40vh] divide-outline-gray-modals text-ink-gray-7 overflow-y-auto"
+					>
 						<div
 							v-for="progress in lessonProgress.data"
-							class="flex justify-between text-sm py-2 my-1"
+							class="flex justify-between text-sm py-2 my-1 text-ink-gray-9"
 						>
 							<div class="">
-								<span class="mr-3 text-xs">
+								<span class="me-3 text-xs">
 									{{ progress.chapter_idx }}.{{ progress.idx }}
 								</span>
 								<span>
@@ -244,6 +248,7 @@
 		v-if="showEnrollmentModal"
 		v-model="showEnrollmentModal"
 		:course="course"
+		:students="progressList"
 	/>
 	<StudentCourseProgress
 		v-if="showProgressModal"
@@ -259,7 +264,6 @@ import {
 	Button,
 	createListResource,
 	createResource,
-	dayjs,
 	Dropdown,
 	ECharts,
 	FormControl,
@@ -272,7 +276,8 @@ import {
 	Select,
 	Tooltip,
 } from 'frappe-ui'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
+import type dayjsType from 'dayjs'
 import { Plus, Star } from 'lucide-vue-next'
 import { formatAmount } from '@/utils'
 import colors from '@/utils/frappe-ui-colors.json'
@@ -285,6 +290,7 @@ const props = defineProps<{
 	course: any
 }>()
 
+const dayjs = inject<typeof dayjsType>('$dayjs')!
 const showEnrollmentModal = ref(false)
 const searchFilter = ref<string | null>(null)
 const showProgressModal = ref(false)
@@ -349,14 +355,12 @@ const updateLessonProgress = (value: string) => {
 }
 
 watch([searchFilter], () => {
-	let filterApplied = false
 	let filters: Filters = {
 		course: props.course.data?.name,
 	}
 
 	if (searchFilter.value) {
 		filters.member_name = ['like', `%${searchFilter.value}%`]
-		filterApplied = true
 	}
 
 	progressList.update({
@@ -392,7 +396,7 @@ const progressColumns = computed(() => {
 			width: '30%',
 		},
 		{
-			label: __('Start Date'),
+			label: __('Enrolled On'),
 			key: 'creation',
 			align: 'right',
 		},

@@ -9,6 +9,7 @@
 			:fileTypes="[fileType]"
 			:validateFile="(file: File) => validateFile(file, true, type)"
 			@success="(file: File) => saveFile(file)"
+			@failure="onUploadFailure"
 		>
 			<template v-slot="{ file, progress, uploading, openFileSelector }">
 				<div class="flex items-center">
@@ -18,9 +19,9 @@
 							class="size-5 stroke-1 text-ink-gray-7"
 						/>
 					</div>
-					<div class="ml-4">
-						<Button @click="openFileSelector">
-							{{ __('Upload') }}
+					<div class="ms-4">
+						<Button @click="openFileSelector" :loading="uploading">
+							{{ uploading ? `${__('Uploading')} ${progress}%` : __('Upload') }}
 						</Button>
 						<div class="mt-1 text-ink-gray-5 text-sm leading-5">
 							{{ __(description) }}
@@ -38,14 +39,14 @@
 						'border object-cover',
 						shape === 'circle'
 							? 'w-20 h-20 rounded-full'
-							: 'w-44 h-auto min-h-20 rounded-md',
+							: 'w-44 h-auto min-h-20 max-h-32 rounded-md',
 					]"
 				/>
 				<video v-else controls class="border rounded-md w-44 h-auto">
 					<source :src="modelValue" />
 					{{ __('Your browser does not support the video tag.') }}
 				</video>
-				<div class="ml-4">
+				<div class="ms-4">
 					<Button @click="removeImage()">
 						{{ __('Remove') }}
 					</Button>
@@ -62,7 +63,7 @@
 </template>
 <script setup lang="ts">
 import { validateFile } from '@/utils'
-import { Button, FileUploader } from 'frappe-ui'
+import { Button, FileUploader, toast } from 'frappe-ui'
 import { Image, Video } from 'lucide-vue-next'
 import { computed } from 'vue'
 
@@ -99,5 +100,15 @@ const saveFile = (file: any) => {
 
 const removeImage = () => {
 	emit('update:modelValue', '')
+}
+
+const onUploadFailure = (error: any) => {
+	let message = __('Error Uploading File')
+	if (error?._server_messages) {
+		message = JSON.parse(JSON.parse(error._server_messages)[0]).message
+	} else if (error?.exc) {
+		message = JSON.parse(error.exc)[0].split('\n').slice(-2, -1)[0]
+	}
+	toast.error(message)
 }
 </script>
