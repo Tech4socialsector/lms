@@ -20,7 +20,7 @@ def validate_username_duplicates(doc, method):
 
 
 def after_insert(doc, method):
-	doc.add_roles("LMS Student")
+	pass
 
 
 @frappe.whitelist(allow_guest=True)
@@ -66,7 +66,6 @@ def sign_up(email: str, full_name: str, verify_terms: bool, user_category: str):
 	if default_role:
 		user.add_roles(default_role)
 
-	user.add_roles("LMS Student")
 	set_country_from_ip(None, user.name)
 
 	if user.flags.email_sent:
